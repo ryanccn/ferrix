@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2025 Ryan Cao <hello@ryanccn.dev>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Check
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  reuse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@56a7bb7b56d9a92d4fd1bc05758de7eea4a370a8 # ratchet:cachix/install-nix-action@v31
+
+      - name: Check
+        run: nix shell nixpkgs#reuse --command reuse lint
+
+  nixfmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # ratchet:actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@56a7bb7b56d9a92d4fd1bc05758de7eea4a370a8 # ratchet:cachix/install-nix-action@v31
+
+      - name: Check
+        run: nix shell nixpkgs#nixfmt --command find . -name '*.nix' -exec nixfmt --check {} +
