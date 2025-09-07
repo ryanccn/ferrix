@@ -6,13 +6,21 @@
   lib = {
     mkFlake =
       inputs:
-      { root, name, ... }@options:
+      {
+        root,
+        ...
+      }@options:
       let
         inherit (inputs) self nixpkgs;
         inherit (nixpkgs) lib;
 
         forAllSystems = lib.genAttrs lib.systems.flakeExposed;
         nixpkgsFor = forAllSystems (system: nixpkgs.legacyPackages.${system});
+
+        cargoManifestPath = lib.path.append root "Cargo.toml";
+        cargoManifest =
+          if builtins.pathExists cargoManifestPath then lib.importTOML cargoManifestPath else { };
+        projectName = cargoManifest.package.name or options.name;
 
         maybeFunction = fn: arg: if builtins.isFunction fn then fn arg else fn;
 
@@ -34,8 +42,8 @@
                 day = builtins.substring 6 2 self.lastModifiedDate;
               in
               rustPlatform.buildRustPackage (finalAttrs: {
-                pname = finalAttrs.passthru.cargoToml.package.name;
-                version = "${finalAttrs.passthru.cargoToml.package.version}-unstable-${year}-${month}-${day}";
+                pname = projectName;
+                version = "${cargoManifest.package.version or 0}-unstable-${year}-${month}-${day}";
 
                 src =
                   options.src or (lib.fileset.toSource {
@@ -97,13 +105,13 @@
 
                 doCheck = options.doCheck or false;
 
-                passthru = {
-                  cargoToml = lib.importTOML (lib.path.append root "Cargo.toml");
-                };
-
                 meta = {
+                  inherit (cargoManifest.package) description;
                   mainProgram = finalAttrs.pname;
                 }
+                // (lib.optionalAttrs ((cargoManifest.package.license or null) != null) {
+                  license = lib.getLicenseFromSpdxId cargoManifest.package.license;
+                })
                 // (options.meta or { });
               })
             )
@@ -135,7 +143,7 @@
               pkgs.stdenv.mkDerivation (
                 {
                   name = "check-${args.name}";
-                  inherit (self.packages.${system}.${name}) src;
+                  inherit (self.packages.${system}.${projectName}) src;
 
                   buildPhase = ''
                     ${args.command}
@@ -182,7 +190,7 @@
                   | clippy-sarif | tee $out | sarif-fmt
               '';
 
-              inherit (self.packages.${system}.${name}) cargoDeps;
+              inherit (self.packages.${system}.${projectName}) cargoDeps;
               nativeBuildInputs = with pkgs; [
                 rustPlatform.cargoSetupHook
                 cargo
@@ -219,7 +227,7 @@
                 self.formatter.${system}
               ];
 
-              inputsFrom = [ self.packages.${system}.${name} ];
+              inputsFrom = [ self.packages.${system}.${projectName} ];
 
               env = {
                 RUST_BACKTRACE = 1;
@@ -236,13 +244,13 @@
             packages = self.overlays.default null pkgs;
           in
           {
-            ${name} = packages.${name};
-            default = packages.${name};
+            ${projectName} = packages.${projectName};
+            default = packages.${projectName};
           }
         )) (options.packages or { });
 
         overlays.default = _: prev: {
-          ${name} = prev.callPackage packageFn { inherit self; };
+          ${projectName} = prev.callPackage packageFn { inherit self; };
         };
 
         formatter = forAllSystems (system: nixpkgsFor.${system}.nixfmt-rfc-style);

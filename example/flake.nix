@@ -15,7 +15,6 @@
     }@inputs:
     ferrix.lib.mkFlake inputs {
       root = ./.;
-      name = "example";
 
       # REUSE doesn't work properly since the top level is not here;
       # it does work when not part of this example.
