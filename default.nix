@@ -37,17 +37,19 @@
                 pname = finalAttrs.passthru.cargoToml.package.name;
                 version = "${finalAttrs.passthru.cargoToml.package.version}-unstable-${year}-${month}-${day}";
 
-                src = lib.fileset.toSource {
-                  inherit root;
-                  fileset = lib.fileset.unions (
-                    map (p: lib.fileset.maybeMissing (lib.path.append root p)) [
-                      "src"
-                      "Cargo.toml"
-                      "Cargo.lock"
-                      "build.rs"
-                    ]
-                  );
-                };
+                src =
+                  options.src or (lib.fileset.toSource {
+                    inherit root;
+                    fileset = lib.fileset.unions (
+                      map (p: lib.fileset.maybeMissing (lib.path.append root p)) [
+                        "src"
+                        "tests"
+                        "Cargo.toml"
+                        "Cargo.lock"
+                        "build.rs"
+                      ]
+                    );
+                  });
 
                 cargoLock = {
                   lockFile = lib.path.append root "Cargo.lock";
