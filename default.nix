@@ -132,158 +132,159 @@
               ) (lib.const true))
             );
       in
-      {
-        checks = forAllSystems (
-          system:
-          let
-            pkgs = nixpkgsFor.${system};
-
-            mkFlakeCheck =
-              args:
-              pkgs.stdenv.mkDerivation (
-                {
-                  name = "check-${args.name}";
-                  inherit (self.packages.${system}.${projectName}) src;
-
-                  buildPhase = ''
-                    ${args.command}
-                    touch "$out"
-                  '';
-
-                  doCheck = false;
-                  dontInstall = true;
-                  dontFixup = true;
-                }
-                // (removeAttrs args [
-                  "name"
-                  "command"
-                ])
-              );
-          in
-          { }
-          // lib.optionalAttrs (options.checks.enableNixfmt or options.checks.enable or true) {
-            nixfmt = mkFlakeCheck {
-              name = "nixfmt";
-              command = "find . -name '*.nix' -exec nixfmt --check {} +";
-
-              src = self;
-              nativeBuildInputs = with pkgs; [ nixfmt-rfc-style ];
-            };
-          }
-          // lib.optionalAttrs (options.checks.enableRustfmt or options.checks.enable or true) {
-            rustfmt = mkFlakeCheck {
-              name = "rustfmt";
-              command = "cargo fmt --check";
-
-              nativeBuildInputs = with pkgs; [
-                cargo
-                rustfmt
-              ];
-            };
-          }
-          // lib.optionalAttrs (options.checks.enableClippy or options.checks.enable or true) {
-            clippy = mkFlakeCheck {
-              name = "clippy";
-              command = ''
-                cargo clippy --all-features --all-targets --tests \
-                  --offline --message-format=json \
-                  | clippy-sarif | tee $out | sarif-fmt
-              '';
-
-              inherit (self.packages.${system}.${projectName}) cargoDeps;
-              nativeBuildInputs = with pkgs; [
-                rustPlatform.cargoSetupHook
-                cargo
-                rustc
-                clippy
-                clippy-sarif
-                sarif-fmt
-              ];
-            };
-          }
-          // lib.optionalAttrs (options.checks.enableREUSE or options.checks.enable or true) {
-            reuse = mkFlakeCheck {
-              name = "reuse";
-              command = "reuse lint";
-
-              src = self;
-              nativeBuildInputs = with pkgs; [ reuse ];
-            };
-          }
-        );
-
-        devShells = forAllSystems (
-          system:
-          let
-            pkgs = nixpkgsFor.${system};
-          in
-          { }
-          // lib.optionalAttrs (options.devShells.enable or true) {
-            default = pkgs.mkShell {
-              packages = with pkgs; [
-                rustfmt
-                clippy
-                rust-analyzer
-                self.formatter.${system}
-              ];
-
-              inputsFrom = [ self.packages.${system}.${projectName} ];
-
-              env = {
-                RUST_BACKTRACE = 1;
-                RUST_SRC_PATH = toString pkgs.rustPlatform.rustLibSrc;
-              };
-            };
-          }
-        );
-
-        packages = lib.recursiveUpdate (forAllSystems (
-          system:
-          let
-            pkgs = nixpkgsFor.${system};
-            packages = self.overlays.default null pkgs;
-          in
-          {
-            ${projectName} = packages.${projectName};
-            default = packages.${projectName};
-          }
-        )) (options.packages or { });
-
-        overlays.default = _: prev: {
-          ${projectName} = prev.callPackage packageFn { inherit self; };
-        };
-
-        formatter = forAllSystems (system: nixpkgsFor.${system}.nixfmt-rfc-style);
-      }
-
-      // {
-        legacyPackages = lib.recursiveUpdate (lib.optionalAttrs (options.enableStaticPackages or true) (
-          forAllSystems (
+      lib.recursiveUpdate (
+        {
+          checks = forAllSystems (
             system:
-            nixpkgsFor.${system}.callPackage (
-              {
-                lib,
-                pkgsCross,
-                self,
-              }:
-              let
-                crossTargets = [
-                  pkgsCross.musl64.pkgsStatic
-                  pkgsCross.aarch64-multiplatform.pkgsStatic
+            let
+              pkgs = nixpkgsFor.${system};
+
+              mkFlakeCheck =
+                args:
+                pkgs.stdenv.mkDerivation (
+                  {
+                    name = "check-${args.name}";
+                    inherit (self.packages.${system}.${projectName}) src;
+
+                    buildPhase = ''
+                      ${args.command}
+                      touch "$out"
+                    '';
+
+                    doCheck = false;
+                    dontInstall = true;
+                    dontFixup = true;
+                  }
+                  // (removeAttrs args [
+                    "name"
+                    "command"
+                  ])
+                );
+            in
+            { }
+            // lib.optionalAttrs (options.checks.enableNixfmt or options.checks.enable or true) {
+              nixfmt = mkFlakeCheck {
+                name = "nixfmt";
+                command = "find . -name '*.nix' -exec nixfmt --check {} +";
+
+                src = self;
+                nativeBuildInputs = with pkgs; [ nixfmt-rfc-style ];
+              };
+            }
+            // lib.optionalAttrs (options.checks.enableRustfmt or options.checks.enable or true) {
+              rustfmt = mkFlakeCheck {
+                name = "rustfmt";
+                command = "cargo fmt --check";
+
+                nativeBuildInputs = with pkgs; [
+                  cargo
+                  rustfmt
                 ];
-              in
-              builtins.listToAttrs (
-                map (
-                  pkgs:
-                  let
-                    package = pkgs.callPackage packageFn { inherit self; };
-                  in
-                  lib.nameValuePair (builtins.parseDrvName package.name).name package
-                ) crossTargets
-              )
-            ) { inherit self; }
-          )
-        )) (options.legacyPackages or { });
-      };
+              };
+            }
+            // lib.optionalAttrs (options.checks.enableClippy or options.checks.enable or true) {
+              clippy = mkFlakeCheck {
+                name = "clippy";
+                command = ''
+                  cargo clippy --all-features --all-targets --tests \
+                    --offline --message-format=json \
+                    | clippy-sarif | tee $out | sarif-fmt
+                '';
+
+                inherit (self.packages.${system}.${projectName}) cargoDeps;
+                nativeBuildInputs = with pkgs; [
+                  rustPlatform.cargoSetupHook
+                  cargo
+                  rustc
+                  clippy
+                  clippy-sarif
+                  sarif-fmt
+                ];
+              };
+            }
+            // lib.optionalAttrs (options.checks.enableREUSE or options.checks.enable or true) {
+              reuse = mkFlakeCheck {
+                name = "reuse";
+                command = "reuse lint";
+
+                src = self;
+                nativeBuildInputs = with pkgs; [ reuse ];
+              };
+            }
+          );
+
+          devShells = forAllSystems (
+            system:
+            let
+              pkgs = nixpkgsFor.${system};
+            in
+            { }
+            // lib.optionalAttrs (options.devShells.enable or true) {
+              default = pkgs.mkShell {
+                packages = with pkgs; [
+                  rustfmt
+                  clippy
+                  rust-analyzer
+                  self.formatter.${system}
+                ];
+
+                inputsFrom = [ self.packages.${system}.${projectName} ];
+
+                env = {
+                  RUST_BACKTRACE = 1;
+                  RUST_SRC_PATH = toString pkgs.rustPlatform.rustLibSrc;
+                };
+              };
+            }
+          );
+
+          packages = forAllSystems (
+            system:
+            let
+              pkgs = nixpkgsFor.${system};
+              packages = self.overlays.default null pkgs;
+            in
+            {
+              ${projectName} = packages.${projectName};
+              default = packages.${projectName};
+            }
+          );
+
+          overlays.default = _: prev: {
+            ${projectName} = prev.callPackage packageFn { inherit self; };
+          };
+
+          formatter = forAllSystems (system: nixpkgsFor.${system}.nixfmt-rfc-style);
+        }
+        // lib.optionalAttrs (options.enableStaticPackages or true) {
+          legacyPackages = (
+            forAllSystems (
+              system:
+              nixpkgsFor.${system}.callPackage (
+                {
+                  lib,
+                  pkgsCross,
+                  self,
+                }:
+                let
+                  crossTargets = [
+                    pkgsCross.musl64.pkgsStatic
+                    pkgsCross.aarch64-multiplatform.pkgsStatic
+                  ];
+                in
+                builtins.listToAttrs (
+                  map (
+                    pkgs:
+                    let
+                      package = pkgs.callPackage packageFn { inherit self; };
+                    in
+                    lib.nameValuePair (builtins.parseDrvName package.name).name package
+                  ) crossTargets
+                )
+              ) { inherit self; }
+            )
+          );
+        }
+      ) (options.flake or { });
   };
 }
