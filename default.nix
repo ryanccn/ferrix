@@ -54,7 +54,11 @@
                         "tests"
                         "Cargo.toml"
                         "Cargo.lock"
-                        "build.rs"
+                        "clippy.toml"
+                        ".clippy.toml"
+                        "rustfmt.toml"
+                        ".rustfmt.toml"
+                        cargoManifest.package.build or "build.rs"
                       ]
                     );
                   });
