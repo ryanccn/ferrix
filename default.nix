@@ -71,7 +71,7 @@
                 buildInputs = options.buildInputs or [ ];
 
                 nativeBuildInputs =
-                  lib.optionals (options.enableCompletions or false) [
+                  lib.optionals (options.completions.enable or false) [
                     installShellFiles
                   ]
                   ++ (options.nativeBuildInputs or [ ]);
@@ -91,12 +91,12 @@
 
                 postInstall =
                   lib.optionalString
-                    ((options.enableCompletions or false) && (stdenv.buildPlatform.canExecute stdenv.hostPlatform))
+                    ((options.completions.enable or false) && (stdenv.buildPlatform.canExecute stdenv.hostPlatform))
                     ''
                       installShellCompletion --cmd ${finalAttrs.pname} \
-                        --bash <("$out/bin/${finalAttrs.pname}" completions bash) \
-                        --zsh <("$out/bin/${finalAttrs.pname}" completions zsh) \
-                        --fish <("$out/bin/${finalAttrs.pname}" completions fish)
+                        --bash <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} bash) \
+                        --zsh <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} zsh) \
+                        --fish <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} fish)
                     ''
                   + lib.concatStringsSep "\n\n" (
                     map (
@@ -261,32 +261,30 @@
           formatter = forAllSystems (system: nixpkgsFor.${system}.nixfmt-rfc-style);
         }
         // lib.optionalAttrs (options.enableStaticPackages or true) {
-          legacyPackages = (
-            forAllSystems (
-              system:
-              nixpkgsFor.${system}.callPackage (
-                {
-                  lib,
-                  pkgsCross,
-                  self,
-                }:
-                let
-                  crossTargets = [
-                    pkgsCross.musl64.pkgsStatic
-                    pkgsCross.aarch64-multiplatform.pkgsStatic
-                  ];
-                in
-                builtins.listToAttrs (
-                  map (
-                    pkgs:
-                    let
-                      package = pkgs.callPackage packageFn { inherit self; };
-                    in
-                    lib.nameValuePair (builtins.parseDrvName package.name).name package
-                  ) crossTargets
-                )
-              ) { inherit self; }
-            )
+          legacyPackages = forAllSystems (
+            system:
+            nixpkgsFor.${system}.callPackage (
+              {
+                lib,
+                pkgsCross,
+                self,
+              }:
+              let
+                crossTargets = [
+                  pkgsCross.musl64.pkgsStatic
+                  pkgsCross.aarch64-multiplatform.pkgsStatic
+                ];
+              in
+              builtins.listToAttrs (
+                map (
+                  pkgs:
+                  let
+                    package = pkgs.callPackage packageFn { inherit self; };
+                  in
+                  lib.nameValuePair (builtins.parseDrvName package.name).name package
+                ) crossTargets
+              )
+            ) { inherit self; }
           );
         }
       ) (options.flake or { });
