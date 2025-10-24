@@ -14,7 +14,7 @@
         inherit (inputs) self nixpkgs;
         inherit (nixpkgs) lib;
 
-        forAllSystems = lib.genAttrs lib.systems.flakeExposed;
+        forAllSystems = lib.genAttrs (options.systems or lib.systems.flakeExposed);
         nixpkgsFor = forAllSystems (system: nixpkgs.legacyPackages.${system});
 
         cargoManifestPath = lib.path.append root "Cargo.toml";

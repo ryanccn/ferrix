@@ -45,6 +45,7 @@ It provides Rust packages with automatically populated package names and metadat
 - `devShells.enable`, `checks.enable`, `checks.enableNixfmt`, `checks.enableRustfmt`, `checks.enableClippy`, `checks.enableREUSE`: enable/disable devshells and specific checks in the flake (_all default to `true`_)
 - `buildInputs`, `nativeBuildInputs`, `env`, `cargoLock`, `meta`: attributes that are merged with the defaults and passed to `rustPlatform.buildRustPackage` (_`meta.description` and `meta.license` inferred from `Cargo.toml` by default_)
 - `extraPostInstall`: extra `postInstall` commands that can be configured with `callPackage` arguments; configured in the shape of `{ enableDoNothing = { default = false; value = ":"; }; }`
+- `systems`: systems to include in flake outputs (_defaults to `lib.systems.flakeExposed`_)
 - `flake.*`: attributes that are recursively merged with the defaults and exposed in the top-level flake
 
 ## License
