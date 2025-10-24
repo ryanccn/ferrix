@@ -110,9 +110,12 @@
                 doCheck = options.doCheck or false;
 
                 meta = {
-                  inherit (cargoManifest.package) description;
                   mainProgram = finalAttrs.pname;
                 }
+                // (lib.filterAttrs (_: v: v != null) {
+                  description = cargoManifest.package.description or null;
+                  homepage = cargoManifest.package.homepage or cargoManifest.package.repository or null;
+                })
                 // (lib.optionalAttrs ((cargoManifest.package.license or null) != null) {
                   license = lib.getLicenseFromSpdxId cargoManifest.package.license;
                 })
