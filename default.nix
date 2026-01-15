@@ -109,6 +109,9 @@
 
                 doCheck = options.doCheck or false;
 
+                cargoBuildFlags = options.cargoBuildFlags or [ ];
+                cargoTestFlags = options.cargoTestFlags or [ ];
+
                 meta = {
                   mainProgram = finalAttrs.pname;
                 }
