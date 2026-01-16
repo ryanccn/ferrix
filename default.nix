@@ -197,7 +197,7 @@
                 name = "clippy";
                 command = ''
                   cargo clippy --all-features --all-targets --tests \
-                    --offline --message-format=json \
+                    --offline --message-format=json ${lib.escapeShellArgs (options.cargoBuildFlags or [ ])} \
                     | clippy-sarif | tee $out | sarif-fmt
                 '';
 
