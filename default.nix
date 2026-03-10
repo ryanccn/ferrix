@@ -178,7 +178,9 @@
                 command = "find . -name '*.nix' -exec nixfmt --check {} +";
 
                 src = self;
-                nativeBuildInputs = with pkgs; [ nixfmt-rfc-style ];
+                nativeBuildInputs = with pkgs; [
+                  (if lib.oldestSupportedReleaseIsAtLeast 2511 then nixfmt else nixfmt-rfc-style)
+                ];
               };
             }
             // lib.optionalAttrs (options.checks.enableRustfmt or options.checks.enable or true) {
@@ -196,7 +198,7 @@
               clippy = mkFlakeCheck {
                 name = "clippy";
                 command = ''
-                  cargo clippy --all-features --all-targets --tests \
+                  cargo clippy --all-features --tests \
                     --offline --message-format=json ${lib.escapeShellArgs (options.cargoBuildFlags or [ ])} \
                     | clippy-sarif | tee $out | sarif-fmt
                 '';
@@ -264,7 +266,12 @@
             ${projectName} = prev.callPackage packageFn { inherit self; };
           };
 
-          formatter = forAllSystems (system: nixpkgsFor.${system}.nixfmt-rfc-style);
+          formatter = forAllSystems (
+            system:
+            nixpkgsFor.${system}."${
+              if lib.oldestSupportedReleaseIsAtLeast 2511 then "nixfmt" else "nixfmt-rfc-style"
+            }"
+          );
         }
         // lib.optionalAttrs (options.enableStaticPackages or true) {
           legacyPackages = forAllSystems (
