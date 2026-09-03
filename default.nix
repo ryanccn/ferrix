@@ -25,122 +25,105 @@
         maybeFunction = fn: arg: if builtins.isFunction fn then fn arg else fn;
 
         packageFn =
-          lib.setFunctionArgs
-            (
-              {
-                lib,
-                stdenv,
-                rustPlatform,
-                installShellFiles,
-                self,
-                enableLTO ? true,
-                enableOptimizeSize ? false,
-              }@restArgs:
-              let
-                year = builtins.substring 0 4 self.lastModifiedDate;
-                month = builtins.substring 4 2 self.lastModifiedDate;
-                day = builtins.substring 6 2 self.lastModifiedDate;
-              in
-              rustPlatform.buildRustPackage (finalAttrs: {
-                pname = projectName;
-                version = "${cargoManifest.package.version or 0}-unstable-${year}-${month}-${day}";
+          {
+            lib,
+            stdenv,
+            rustPlatform,
+            installShellFiles,
+            self,
+            enableLTO ? true,
+            enableOptimizeSize ? false,
+          }:
+          let
+            year = builtins.substring 0 4 self.lastModifiedDate;
+            month = builtins.substring 4 2 self.lastModifiedDate;
+            day = builtins.substring 6 2 self.lastModifiedDate;
+          in
+          rustPlatform.buildRustPackage (finalAttrs: {
+            pname = projectName;
+            version = "${cargoManifest.package.version or 0}-unstable-${year}-${month}-${day}";
 
-                src =
-                  options.src or (lib.fileset.toSource {
-                    inherit root;
-                    fileset = lib.fileset.unions (
-                      map (p: lib.fileset.maybeMissing (lib.path.append root p)) [
-                        "src"
-                        "tests"
-                        "Cargo.toml"
-                        "Cargo.lock"
-                        "clippy.toml"
-                        ".clippy.toml"
-                        "rustfmt.toml"
-                        ".rustfmt.toml"
-                        cargoManifest.package.build or "build.rs"
-                      ]
-                    );
-                  });
-
-                cargoLock = {
-                  lockFile = lib.path.append root "Cargo.lock";
-                }
-                // (options.cargoLock or { });
-
-                buildInputs = options.buildInputs or [ ];
-
-                nativeBuildInputs =
-                  lib.optionals (options.completions.enable or false) [
-                    installShellFiles
+            src =
+              options.src or (lib.fileset.toSource {
+                inherit root;
+                fileset = lib.fileset.unions (
+                  map (p: lib.fileset.maybeMissing (lib.path.append root p)) [
+                    "src"
+                    "tests"
+                    "Cargo.toml"
+                    "Cargo.lock"
+                    "clippy.toml"
+                    ".clippy.toml"
+                    "rustfmt.toml"
+                    ".rustfmt.toml"
+                    cargoManifest.package.build or "build.rs"
                   ]
-                  ++ (options.nativeBuildInputs or [ ]);
+                );
+              });
 
-                env =
-                  lib.optionalAttrs enableLTO {
-                    CARGO_PROFILE_RELEASE_LTO = "fat";
-                    CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1";
-                  }
-                  // lib.optionalAttrs enableOptimizeSize {
-                    CARGO_PROFILE_RELEASE_OPT_LEVEL = "z";
-                    CARGO_PROFILE_RELEASE_PANIC = "abort";
-                    CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1";
-                    CARGO_PROFILE_RELEASE_STRIP = "symbols";
-                  }
-                  // maybeFunction (options.env or { }) finalAttrs;
+            cargoLock = {
+              lockFile = lib.path.append root "Cargo.lock";
+            }
+            // (options.cargoLock or { });
 
-                postInstall =
-                  lib.optionalString
-                    ((options.completions.enable or false) && (stdenv.buildPlatform.canExecute stdenv.hostPlatform))
-                    ''
-                      installShellCompletion --cmd ${finalAttrs.pname} \
-                        --bash <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} bash) \
-                        --zsh <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} zsh) \
-                        --fish <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} fish)
-                    ''
-                  + lib.concatStringsSep "\n\n" (
-                    map (
-                      pi:
-                      lib.optionalString (restArgs.${pi.name} or pi.value.default) (
-                        maybeFunction pi.value.value finalAttrs
-                      )
-                    ) (lib.attrsToList (options.extraPostInstall or { }))
-                  );
+            buildInputs =
+              if options ? "buildInputs" then
+                (maybeFunction options.buildInputs nixpkgsFor.${stdenv.system})
+              else
+                [ ];
 
-                doCheck = options.doCheck or false;
+            nativeBuildInputs =
+              lib.optionals (options.completions.enable or false) [
+                installShellFiles
+              ]
+              ++ (
+                if options ? "nativeBuildInputs" then
+                  (maybeFunction options.nativeBuildInputs nixpkgsFor.${stdenv.system})
+                else
+                  [ ]
+              );
 
-                cargoBuildFlags = options.cargoBuildFlags or [ ];
-                cargoTestFlags = options.cargoTestFlags or [ ];
-
-                meta = {
-                  mainProgram = finalAttrs.pname;
-                }
-                // (lib.filterAttrs (_: v: v != null) {
-                  description = cargoManifest.package.description or null;
-                  homepage = cargoManifest.package.homepage or cargoManifest.package.repository or null;
-                })
-                // (lib.optionalAttrs ((cargoManifest.package.license or null) != null) {
-                  license = lib.getLicenseFromSpdxId cargoManifest.package.license;
-                })
-                // (options.meta or { });
-              })
-            )
-            (
-              {
-                self = false;
+            env =
+              lib.optionalAttrs enableLTO {
+                CARGO_PROFILE_RELEASE_LTO = "fat";
+                CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1";
               }
-              // (lib.genAttrs (
-                [
-                  "lib"
-                  "stdenv"
-                  "rustPlatform"
-                  "installShellFiles"
-                  "enableLTO"
-                  "enableOptimizeSize"
-                ]
-                ++ (builtins.attrNames (options.extraPostInstall or { }))
-              ) (lib.const true))
-            );
+              // lib.optionalAttrs enableOptimizeSize {
+                CARGO_PROFILE_RELEASE_OPT_LEVEL = "z";
+                CARGO_PROFILE_RELEASE_PANIC = "abort";
+                CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "1";
+                CARGO_PROFILE_RELEASE_STRIP = "symbols";
+              }
+              // maybeFunction (options.env or { }) finalAttrs;
+
+            postInstall =
+              lib.optionalString
+                ((options.completions.enable or false) && (stdenv.buildPlatform.canExecute stdenv.hostPlatform))
+                ''
+                  installShellCompletion --cmd ${finalAttrs.pname} \
+                    --bash <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} bash) \
+                    --zsh <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} zsh) \
+                    --fish <("$out/bin/${finalAttrs.pname}" ${options.completions.args or "completions"} fish)
+                ''
+              + options.extraPostInstall or "";
+
+            doCheck = options.doCheck or false;
+
+            cargoBuildFlags = options.cargoBuildFlags or [ ];
+            cargoTestFlags = options.cargoTestFlags or [ ];
+
+            meta = {
+              mainProgram = finalAttrs.pname;
+            }
+            // (lib.filterAttrs (_: v: v != null) {
+              description = cargoManifest.package.description or null;
+              homepage = cargoManifest.package.homepage or cargoManifest.package.repository or null;
+            })
+            // (lib.optionalAttrs ((cargoManifest.package.license or null) != null) {
+              license = lib.getLicenseFromSpdxId cargoManifest.package.license;
+            })
+            // (options.meta or { });
+          });
       in
       lib.recursiveUpdate (
         {
