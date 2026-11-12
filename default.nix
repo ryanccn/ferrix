@@ -25,12 +25,12 @@
         maybeFunction = fn: arg: if builtins.isFunction fn then fn arg else fn;
 
         packageFn =
-          pkgsHost:
           {
             lib,
             stdenv,
             rustPlatform,
-            installShellFiles,
+            pkgsBuildHost,
+            pkgsHostTarget,
             self,
             enableLTO ? true,
             enableOptimizeSize ? false,
@@ -67,15 +67,16 @@
             }
             // (options.cargoLock or { });
 
-            buildInputs = if options ? "buildInputs" then (maybeFunction options.buildInputs pkgsHost) else [ ];
+            buildInputs =
+              if options ? "buildInputs" then (maybeFunction options.buildInputs pkgsHostTarget) else [ ];
 
             nativeBuildInputs =
               lib.optionals (options.completions.enable or false) [
-                installShellFiles
+                pkgsBuildHost.installShellFiles
               ]
               ++ (
                 if options ? "nativeBuildInputs" then
-                  (maybeFunction options.nativeBuildInputs nixpkgsFor.${stdenv.system})
+                  (maybeFunction options.nativeBuildInputs pkgsBuildHost)
                 else
                   [ ]
               );
@@ -247,7 +248,7 @@
           );
 
           overlays.default = _: prev: {
-            ${projectName} = prev.callPackage (packageFn prev) { inherit self; };
+            ${projectName} = prev.callPackage packageFn { inherit self; };
           };
 
           formatter = forAllSystems (
@@ -276,7 +277,7 @@
                 map (
                   pkgs:
                   let
-                    package = pkgs.callPackage (packageFn pkgs) { inherit self; };
+                    package = pkgs.callPackage packageFn { inherit self; };
                   in
                   lib.nameValuePair (builtins.parseDrvName package.name).name package
                 ) crossTargets
