@@ -183,7 +183,7 @@
                     | clippy-sarif | tee $out | sarif-fmt
                 '';
 
-                inherit (self.packages.${system}.${projectName}) cargoDeps buildInputs;
+                inherit (self.packages.${system}.${projectName}) cargoDeps env buildInputs;
                 nativeBuildInputs =
                   self.packages.${system}.${projectName}.nativeBuildInputs
                   ++ (with pkgs; [
