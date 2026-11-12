@@ -25,6 +25,7 @@
         maybeFunction = fn: arg: if builtins.isFunction fn then fn arg else fn;
 
         packageFn =
+          pkgsHost:
           {
             lib,
             stdenv,
@@ -66,11 +67,7 @@
             }
             // (options.cargoLock or { });
 
-            buildInputs =
-              if options ? "buildInputs" then
-                (maybeFunction options.buildInputs nixpkgsFor.${stdenv.system})
-              else
-                [ ];
+            buildInputs = if options ? "buildInputs" then (maybeFunction options.buildInputs pkgsHost) else [ ];
 
             nativeBuildInputs =
               lib.optionals (options.completions.enable or false) [
@@ -248,7 +245,7 @@
           );
 
           overlays.default = _: prev: {
-            ${projectName} = prev.callPackage packageFn { inherit self; };
+            ${projectName} = prev.callPackage (packageFn prev) { inherit self; };
           };
 
           formatter = forAllSystems (
@@ -277,7 +274,7 @@
                 map (
                   pkgs:
                   let
-                    package = pkgs.callPackage packageFn { inherit self; };
+                    package = pkgs.callPackage (packageFn pkgs) { inherit self; };
                   in
                   lib.nameValuePair (builtins.parseDrvName package.name).name package
                 ) crossTargets
