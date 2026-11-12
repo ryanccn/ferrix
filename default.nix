@@ -186,15 +186,17 @@
                     | clippy-sarif | tee $out | sarif-fmt
                 '';
 
-                inherit (self.packages.${system}.${projectName}) cargoDeps;
-                nativeBuildInputs = with pkgs; [
-                  rustPlatform.cargoSetupHook
-                  cargo
-                  rustc
-                  clippy
-                  clippy-sarif
-                  sarif-fmt
-                ];
+                inherit (self.packages.${system}.${projectName}) cargoDeps buildInputs;
+                nativeBuildInputs =
+                  self.packages.${system}.${projectName}.nativeBuildInputs
+                  ++ (with pkgs; [
+                    rustPlatform.cargoSetupHook
+                    cargo
+                    rustc
+                    clippy
+                    clippy-sarif
+                    sarif-fmt
+                  ]);
               };
             }
             // lib.optionalAttrs (options.checks.enableREUSE or options.checks.enable or true) {
