@@ -183,7 +183,9 @@
                     | clippy-sarif | tee $out | sarif-fmt
                 '';
 
-                inherit (self.packages.${system}.${projectName}) cargoDeps env buildInputs;
+                env = maybeFunction (options.env or { }) { };
+
+                inherit (self.packages.${system}.${projectName}) cargoDeps buildInputs;
                 nativeBuildInputs =
                   self.packages.${system}.${projectName}.nativeBuildInputs
                   ++ (with pkgs; [
